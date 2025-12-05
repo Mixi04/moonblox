@@ -33,6 +33,14 @@ const LEVEL_SYSTEM = [
 
 const CLOUD_IMG_URL = "https://res.cloudinary.com/ddgmnys0o/image/upload/v1764974680/83816441-abca-4572-96f9-4cf14f3a8f09.png";
 
+// Game Cover Images
+const COVER_IMAGES = {
+    BLACKJACK: "https://res.cloudinary.com/devlfz6tf/image/upload/v1764978071/0a6f6930-eda4-4969-b5df-1243d63d67b9.png",
+    MINES: "https://res.cloudinary.com/devlfz6tf/image/upload/v1764978031/d0eed63e-3985-4b14-ac5a-11503b92b728.png",
+    COINFLIP: "https://res.cloudinary.com/devlfz6tf/image/upload/v1764978020/ef85ab4d-a03b-4b14-949b-07fcde55ec3d.png",
+    CRASH: "https://res.cloudinary.com/devlfz6tf/image/upload/v1764978237/b902a774-3fdb-4f5e-979e-74edc33d7f6e.png"
+};
+
 const App: React.FC = () => {
   // Default Initial State - All users start level 0 and 0 balance
   const [user, setUser] = useState<UserState>({
@@ -46,7 +54,9 @@ const App: React.FC = () => {
         totalWagered: 0
   });
 
-  const [currentPage, setCurrentPage] = useState('HOME');
+  // Client-Side Router State
+  const [currentPath, setCurrentPath] = useState(window.location.pathname);
+  
   const [isChatOpen, setIsChatOpen] = useState(true);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
@@ -54,6 +64,20 @@ const App: React.FC = () => {
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
   const [walletTab, setWalletTab] = useState<'DEPOSIT' | 'WITHDRAW'>('DEPOSIT');
   const [authMode, setAuthMode] = useState<AuthMode>('SIGNUP');
+
+  // Handle Browser Back/Forward
+  useEffect(() => {
+    const handlePopState = () => {
+        setCurrentPath(window.location.pathname);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const navigate = (path: string) => {
+      window.history.pushState({}, '', path);
+      setCurrentPath(path);
+  };
 
   // Supabase Auth Listener & Profile Fetcher
   useEffect(() => {
@@ -178,7 +202,7 @@ const App: React.FC = () => {
           usernameChanged: false,
           totalWagered: 0
       }); 
-      setCurrentPage('HOME'); 
+      navigate('/'); 
   };
 
   const handleUpdateProfile = (updates: Partial<UserState>) => {
@@ -256,36 +280,50 @@ const App: React.FC = () => {
       </div>
   );
 
-  const GameCardSmall = ({ title, icon: Icon, color, isNew, onClick, balance }: any) => (
+  const GameCardSmall = ({ title, icon: Icon, color, isNew, onClick, balance, coverImage }: any) => (
       <div 
         onClick={onClick}
-        className="bg-blox-surface/40 backdrop-blur-xl border border-blox-border/50 rounded-2xl p-4 h-32 relative group cursor-pointer hover:border-blox-accent transition-all overflow-hidden shadow-lg"
+        className="relative h-32 rounded-2xl p-4 overflow-hidden group cursor-pointer border border-blox-border/50 hover:border-blox-accent transition-all shadow-lg bg-blox-surface/40 backdrop-blur-xl"
       >
-          <div className={`absolute -right-6 -bottom-6 w-24 h-24 rounded-full ${color} opacity-10 group-hover:opacity-20 blur-xl transition-opacity`}></div>
-          
-          <div className="flex justify-between items-start mb-2">
-              <div className="flex items-center gap-2">
-                <div className="bg-black/20 p-1.5 rounded-lg">
-                    <Icon size={16} className="text-gray-300 group-hover:text-white transition-colors" />
-                </div>
-                <span className="font-bold text-white uppercase text-sm">{title}</span>
+          {/* Background Image if available */}
+          {coverImage && (
+              <div 
+                className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-110 opacity-80"
+                style={{ backgroundImage: `url(${coverImage})` }}
+              >
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent"></div>
               </div>
-              {isNew && <span className="bg-[#F59E0B]/20 text-[#F59E0B] text-[10px] font-bold px-2 py-0.5 rounded border border-[#F59E0B]/30">New</span>}
+          )}
+
+          {!coverImage && (
+             <div className={`absolute -right-6 -bottom-6 w-24 h-24 rounded-full ${color} opacity-10 group-hover:opacity-20 blur-xl transition-opacity`}></div>
+          )}
+          
+          <div className="relative z-10 flex justify-between items-start mb-2">
+              <div className="flex items-center gap-2">
+                <div className="bg-black/40 backdrop-blur-md p-1.5 rounded-lg border border-white/10">
+                    <Icon size={16} className="text-gray-200 group-hover:text-white transition-colors" />
+                </div>
+                <span className="font-black text-white uppercase text-sm drop-shadow-md tracking-wide">{title}</span>
+              </div>
+              {isNew && <span className="bg-[#F59E0B] text-black text-[10px] font-black px-2 py-0.5 rounded shadow-lg">NEW</span>}
           </div>
 
-          <div className="absolute bottom-0 left-0 w-full h-1/2 flex items-center justify-center translate-y-full group-hover:translate-y-0 transition-transform duration-300 bg-gradient-to-t from-blox-surface to-transparent">
-             <span className="text-blox-accent font-bold text-xs uppercase tracking-widest">Click to Play</span>
-          </div>
+          {!coverImage && (
+            <div className="relative z-10 mt-4 flex justify-center group-hover:scale-110 transition-transform duration-300">
+                <Icon size={40} className={`drop-shadow-lg opacity-80 ${color.replace('bg-', 'text-')}`} />
+            </div>
+          )}
 
-          <div className="mt-4 flex justify-center group-hover:scale-110 transition-transform duration-300">
-             <Icon size={40} className={`drop-shadow-lg opacity-80 ${color.replace('bg-', 'text-')}`} />
+          <div className="absolute bottom-0 left-0 w-full h-1/2 flex items-center justify-center translate-y-full group-hover:translate-y-0 transition-transform duration-300 z-20">
+             <span className="text-blox-accent font-black text-xs uppercase tracking-widest drop-shadow-lg bg-black/50 px-3 py-1 rounded-full border border-blox-accent/30 backdrop-blur-sm">Click to Play</span>
           </div>
           
           {/* Jackpot/Pot display simulator */}
           {balance && (
-              <div className="absolute bottom-3 left-3 bg-black/40 px-2 py-1 rounded border border-white/5 flex items-center gap-1 group-hover:opacity-0 transition-opacity">
+              <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-md px-2 py-1 rounded-lg border border-white/10 flex items-center gap-1 group-hover:opacity-0 transition-opacity z-10">
                   <div className="w-3 h-3 rounded-full bg-yellow-500 flex items-center justify-center text-[8px] text-black font-bold">M</div>
-                  <span className="text-[10px] font-mono text-yellow-500">{balance}</span>
+                  <span className="text-[10px] font-mono font-bold text-yellow-500">{balance}</span>
               </div>
           )}
       </div>
@@ -348,12 +386,14 @@ const App: React.FC = () => {
                     icon={Rocket} 
                     color="bg-red-500" 
                     balance="200,000"
-                    onClick={() => setCurrentPage('CRASH')} 
+                    coverImage={COVER_IMAGES.CRASH}
+                    onClick={() => navigate('/crash')} 
                />
                <GameCardSmall 
                     title="Blackjack" 
                     icon={LayoutGrid} 
                     color="bg-indigo-500" 
+                    coverImage={COVER_IMAGES.BLACKJACK}
                     onClick={() => {}} 
                />
                <GameCardSmall 
@@ -361,17 +401,74 @@ const App: React.FC = () => {
                     icon={Coins} 
                     color="bg-yellow-500" 
                     isNew 
-                    onClick={() => setCurrentPage('COINFLIP')} 
+                    coverImage={COVER_IMAGES.COINFLIP}
+                    onClick={() => navigate('/coinflip')} 
                />
                <GameCardSmall 
                     title="Mines" 
                     icon={Bomb} 
                     color="bg-emerald-500" 
-                    onClick={() => setCurrentPage('MINES')} 
+                    coverImage={COVER_IMAGES.MINES}
+                    onClick={() => navigate('/mines')} 
                />
           </div>
       </div>
   );
+
+  const renderContent = () => {
+      switch (currentPath) {
+          case '/leaderboard':
+              return <Leaderboard user={user} onGoHome={() => navigate('/')} />;
+          case '/crash':
+              return (
+                <div className="p-6 max-w-7xl mx-auto">
+                    <button onClick={() => navigate('/')} className="mb-4 text-gray-500 hover:text-white flex items-center gap-1 text-sm font-bold transition-colors">
+                        <ChevronRight className="rotate-180" size={16}/> Back to Home
+                    </button>
+                    <Crash 
+                        balance={user.balance} 
+                        updateBalance={updateBalance} 
+                        onPlay={handleGamePlay}
+                        isLoggedIn={user.isLoggedIn}
+                        onOpenLogin={handleOpenLogin}
+                    />
+                </div>
+              );
+          case '/coinflip':
+              return (
+                <div className="p-6 max-w-6xl mx-auto">
+                        <button onClick={() => navigate('/')} className="mb-4 text-gray-500 hover:text-white flex items-center gap-1 text-sm font-bold transition-colors">
+                        <ChevronRight className="rotate-180" size={16}/> Back to Home
+                    </button>
+                    <CoinFlip 
+                        balance={user.balance} 
+                        updateBalance={updateBalance} 
+                        onPlay={handleGamePlay}
+                        isLoggedIn={user.isLoggedIn}
+                        onOpenLogin={handleOpenLogin}
+                    />
+                </div>
+              );
+          case '/mines':
+              return (
+                <div className="p-6 max-w-6xl mx-auto">
+                        <button onClick={() => navigate('/')} className="mb-4 text-gray-500 hover:text-white flex items-center gap-1 text-sm font-bold transition-colors">
+                        <ChevronRight className="rotate-180" size={16}/> Back to Home
+                    </button>
+                    <Mines 
+                        balance={user.balance} 
+                        updateBalance={updateBalance} 
+                        onPlay={handleGamePlay}
+                        isLoggedIn={user.isLoggedIn}
+                        onOpenLogin={handleOpenLogin}
+                    />
+                </div>
+              );
+          case '/':
+          default:
+              return <Home />;
+      }
+  };
 
   return (
     <div className="flex h-screen bg-[#020617] text-blox-text font-sans overflow-hidden">
@@ -391,6 +488,7 @@ const App: React.FC = () => {
                 isOpen={isChatOpen} 
                 onClose={() => setIsChatOpen(false)} 
                 username={user.username}
+                avatar={user.avatar}
                 isLoggedIn={user.isLoggedIn}
                 onOpenLogin={handleOpenLogin}
              />
@@ -406,8 +504,8 @@ const App: React.FC = () => {
                 onOpenSettings={() => setIsSettingsModalOpen(true)}
                 onOpenProfile={() => setIsProfileModalOpen(true)}
                 onOpenWallet={handleOpenWallet}
-                currentPage={currentPage}
-                setCurrentPage={setCurrentPage}
+                currentPath={currentPath}
+                navigate={navigate}
                 isChatOpen={isChatOpen}
                 setIsChatOpen={setIsChatOpen}
              />
@@ -473,55 +571,7 @@ const App: React.FC = () => {
                   </div>
                   
                   <div className="relative z-10 pb-10 min-h-full">
-                    {currentPage === 'HOME' && <Home />}
-                    {currentPage === 'LEADERBOARD' && (
-                        <Leaderboard 
-                            user={user}
-                            onGoHome={() => setCurrentPage('HOME')}
-                        />
-                    )}
-                    {currentPage === 'CRASH' && (
-                        <div className="p-6 max-w-7xl mx-auto">
-                            <button onClick={() => setCurrentPage('HOME')} className="mb-4 text-gray-500 hover:text-white flex items-center gap-1 text-sm font-bold transition-colors">
-                                <ChevronRight className="rotate-180" size={16}/> Back to Home
-                            </button>
-                            <Crash 
-                                balance={user.balance} 
-                                updateBalance={updateBalance} 
-                                onPlay={handleGamePlay}
-                                isLoggedIn={user.isLoggedIn}
-                                onOpenLogin={handleOpenLogin}
-                            />
-                        </div>
-                    )}
-                    {currentPage === 'COINFLIP' && (
-                        <div className="p-6 max-w-6xl mx-auto">
-                             <button onClick={() => setCurrentPage('HOME')} className="mb-4 text-gray-500 hover:text-white flex items-center gap-1 text-sm font-bold transition-colors">
-                                <ChevronRight className="rotate-180" size={16}/> Back to Home
-                            </button>
-                            <CoinFlip 
-                                balance={user.balance} 
-                                updateBalance={updateBalance} 
-                                onPlay={handleGamePlay}
-                                isLoggedIn={user.isLoggedIn}
-                                onOpenLogin={handleOpenLogin}
-                            />
-                        </div>
-                    )}
-                    {currentPage === 'MINES' && (
-                        <div className="p-6 max-w-6xl mx-auto">
-                             <button onClick={() => setCurrentPage('HOME')} className="mb-4 text-gray-500 hover:text-white flex items-center gap-1 text-sm font-bold transition-colors">
-                                <ChevronRight className="rotate-180" size={16}/> Back to Home
-                            </button>
-                            <Mines 
-                                balance={user.balance} 
-                                updateBalance={updateBalance} 
-                                onPlay={handleGamePlay}
-                                isLoggedIn={user.isLoggedIn}
-                                onOpenLogin={handleOpenLogin}
-                            />
-                        </div>
-                    )}
+                    {renderContent()}
                   </div>
              </main>
         </div>

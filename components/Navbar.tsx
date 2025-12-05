@@ -11,13 +11,13 @@ interface NavbarProps {
   onOpenSettings: () => void;
   onOpenProfile: () => void;
   onOpenWallet: (tab: 'DEPOSIT' | 'WITHDRAW') => void;
-  currentPage: string;
-  setCurrentPage: (page: string) => void;
+  currentPath: string;
+  navigate: (path: string) => void;
   isChatOpen: boolean;
   setIsChatOpen: (isOpen: boolean) => void;
 }
 
-const Navbar: React.FC<NavbarProps> = ({ user, onLogout, onOpenLogin, onOpenSignup, onOpenSettings, onOpenProfile, onOpenWallet, setCurrentPage, isChatOpen, setIsChatOpen }) => {
+const Navbar: React.FC<NavbarProps> = ({ user, onLogout, onOpenLogin, onOpenSignup, onOpenSettings, onOpenProfile, onOpenWallet, navigate, isChatOpen, setIsChatOpen }) => {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   return (
@@ -39,7 +39,7 @@ const Navbar: React.FC<NavbarProps> = ({ user, onLogout, onOpenLogin, onOpenSign
             {/* Logo */}
             <div 
               className="flex items-center gap-2 cursor-pointer hover:scale-105 transition-transform"
-              onClick={() => setCurrentPage('HOME')}
+              onClick={() => navigate('/')}
             >
               <div className="text-2xl font-black italic tracking-tighter text-white flex items-center">
                 <span>Moon</span>
@@ -51,7 +51,7 @@ const Navbar: React.FC<NavbarProps> = ({ user, onLogout, onOpenLogin, onOpenSign
             {/* Main Nav Buttons */}
             <div className="hidden lg:flex items-center gap-3">
                 <button 
-                  onClick={() => setCurrentPage('HOME')}
+                  onClick={() => navigate('/')}
                   className="flex items-center gap-2 px-4 py-2 bg-blox-surfaceHighlight border border-blox-border rounded-lg text-sm font-bold text-gray-300 hover:text-white hover:border-blox-accent transition-all"
                 >
                     <HomeIcon size={16} className="text-blox-accent" />
@@ -67,7 +67,9 @@ const Navbar: React.FC<NavbarProps> = ({ user, onLogout, onOpenLogin, onOpenSign
                 </button>
 
                  <button 
-                  className="flex items-center gap-2 px-4 py-2 bg-[#F59E0B]/20 border border-[#F59E0B]/40 rounded-lg text-sm font-bold text-[#F59E0B] hover:bg-[#F59E0B]/30 transition-all"
+                  onClick={(e) => e.preventDefault()}
+                  className="flex items-center gap-2 px-4 py-2 bg-[#F59E0B]/20 border border-[#F59E0B]/40 rounded-lg text-sm font-bold text-[#F59E0B] hover:bg-[#F59E0B]/30 transition-all cursor-not-allowed opacity-80"
+                  title="Coming Soon"
                 >
                     <Gift size={16} />
                     FAUCET
@@ -199,13 +201,13 @@ const Navbar: React.FC<NavbarProps> = ({ user, onLogout, onOpenLogin, onOpenSign
       
       {/* Secondary Nav Bar */}
       <div className="h-12 bg-[#17151F] border-b border-blox-border flex items-center px-6 gap-8 overflow-x-auto scrollbar-hide text-xs font-bold text-gray-500 uppercase tracking-wide relative z-10">
-          <a href="#" className="hover:text-blox-accent transition-colors whitespace-nowrap">Redeem</a>
-          <a href="#" className="hover:text-blox-accent transition-colors whitespace-nowrap">Affiliates</a>
-          <a href="#" className="text-blox-accent transition-colors whitespace-nowrap">Faucet</a>
-          <button onClick={() => setCurrentPage('LEADERBOARD')} className="hover:text-blox-accent transition-colors whitespace-nowrap">Leaderboard</button>
-          <a href="#" className="hover:text-blox-accent transition-colors whitespace-nowrap">Daily Cases</a>
-          <a href="#" className="hover:text-blox-accent transition-colors whitespace-nowrap">FAQ</a>
-          <a href="#" className="hover:text-blox-accent transition-colors whitespace-nowrap">Fairness</a>
+          <a href="#" onClick={(e) => e.preventDefault()} className="hover:text-blox-accent transition-colors whitespace-nowrap">Redeem</a>
+          <a href="#" onClick={(e) => e.preventDefault()} className="hover:text-blox-accent transition-colors whitespace-nowrap">Affiliates</a>
+          <a href="#" onClick={(e) => e.preventDefault()} className="text-blox-accent transition-colors whitespace-nowrap">Faucet</a>
+          <button onClick={() => navigate('/leaderboard')} className="hover:text-blox-accent transition-colors whitespace-nowrap">Leaderboard</button>
+          <a href="#" onClick={(e) => e.preventDefault()} className="hover:text-blox-accent transition-colors whitespace-nowrap">Daily Cases</a>
+          <a href="#" onClick={(e) => e.preventDefault()} className="hover:text-blox-accent transition-colors whitespace-nowrap">FAQ</a>
+          <a href="#" onClick={(e) => e.preventDefault()} className="hover:text-blox-accent transition-colors whitespace-nowrap">Fairness</a>
       </div>
     </div>
   );

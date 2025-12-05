@@ -8,11 +8,12 @@ interface ChatProps {
     isOpen: boolean;
     onClose: () => void;
     username: string;
+    avatar?: string;
     isLoggedIn: boolean;
     onOpenLogin: () => void;
 }
 
-const Chat: React.FC<ChatProps> = ({ isOpen, onClose, username, isLoggedIn, onOpenLogin }) => {
+const Chat: React.FC<ChatProps> = ({ isOpen, onClose, username, avatar, isLoggedIn, onOpenLogin }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [onlineUsers] = useState(516);
@@ -116,6 +117,7 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onClose, username, isLoggedIn, onOp
             user_id: user.id,
             username: username,
             text: textToSend,
+            avatar: avatar, // Save current avatar
             rank: 'USER' // Can be enhanced to fetch real rank
         });
     
