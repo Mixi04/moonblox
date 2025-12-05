@@ -11,6 +11,7 @@ import ProfileModal from './components/ProfileModal';
 import WalletModal from './components/WalletModal';
 import Leaderboard from './components/Leaderboard';
 import { UserState, AuthMode } from './types';
+import { supabase } from './supabaseClient';
 import { 
     Rocket, Coins, Bomb, ArrowUpCircle, Sword, 
     Castle, Crown, Box, LayoutGrid, ChevronRight 
@@ -40,7 +41,9 @@ const App: React.FC = () => {
         isLoggedIn: false,
         level: 0,
         xp: 0,
-        claimedLevels: []
+        claimedLevels: [],
+        usernameChanged: false,
+        totalWagered: 0
   });
 
   const [currentPage, setCurrentPage] = useState('HOME');
@@ -52,110 +55,160 @@ const App: React.FC = () => {
   const [walletTab, setWalletTab] = useState<'DEPOSIT' | 'WITHDRAW'>('DEPOSIT');
   const [authMode, setAuthMode] = useState<AuthMode>('SIGNUP');
 
-  // Load from local storage and migrate if necessary
+  // Supabase Auth Listener & Profile Fetcher
   useEffect(() => {
-    // Check for MoonBlox User
-    const saved = localStorage.getItem('moonblox_user');
-    if (saved) {
-        const parsed = JSON.parse(saved);
-        setUser({
-            ...parsed,
-            level: parsed.level ?? 0,
-            xp: parsed.xp ?? 0,
-            claimedLevels: parsed.claimedLevels ?? []
-        });
-    } else {
-        // Migration: Check for BloxSim User
-        const old = localStorage.getItem('bloxsim_user');
-        if (old) {
-            const parsed = JSON.parse(old);
-             setUser({
-                ...parsed,
-                level: parsed.level ?? 0,
-                xp: parsed.xp ?? 0,
-                claimedLevels: parsed.claimedLevels ?? []
-            });
-            // Clean up old key
-            localStorage.removeItem('bloxsim_user');
+    // 1. Check active session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session?.user) {
+            fetchUserProfile(session.user.id, session.user.email);
         }
-    }
+    });
+
+    // 2. Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        if (session?.user) {
+            fetchUserProfile(session.user.id, session.user.email);
+            setIsAuthModalOpen(false);
+        } else {
+            // Signed out
+            setUser({
+                balance: 0,
+                username: 'Guest',
+                isLoggedIn: false,
+                level: 0,
+                xp: 0,
+                claimedLevels: [],
+                usernameChanged: false,
+                totalWagered: 0
+            });
+        }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  // Save to local storage
-  useEffect(() => {
-    if (user.isLoggedIn) localStorage.setItem('moonblox_user', JSON.stringify(user));
-  }, [user]);
-
-  const updateBalance = (amount: number) => {
-      setUser(p => ({ 
-        ...p, 
-        balance: p.balance + amount
-      }));
+  const fetchUserProfile = async (userId: string, email?: string) => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+      
+      if (data) {
+          setUser({
+              username: data.username || 'User',
+              email: email,
+              balance: Number(data.balance) || 0,
+              level: data.level || 0,
+              xp: Number(data.xp) || 0,
+              avatar: data.avatar || undefined,
+              claimedLevels: data.claimed_levels || [],
+              usernameChanged: data.username_changed || false,
+              totalWagered: Number(data.total_wagered) || 0,
+              isLoggedIn: true
+          });
+      }
   };
 
-  // Called whenever a user wagers money in a game
-  const handleGamePlay = (wagerAmount: number) => {
-      setUser(p => {
-          // 1 XP per 1 Coin wagered
-          const xpGain = Math.floor(wagerAmount); 
-          const newXp = (p.xp || 0) + xpGain;
-          
-          let newLevel = p.level || 0;
-          
-          // Check for Level Up
-          for (const tier of LEVEL_SYSTEM) {
-              if (newXp >= tier.xpRequired && tier.level > newLevel) {
-                  newLevel = tier.level;
-              }
+  const updateBalance = async (amount: number) => {
+      if (!user.isLoggedIn) return;
+
+      const newBalance = user.balance + amount;
+      
+      // Optimistic Update
+      setUser(p => ({ ...p, balance: newBalance }));
+
+      // DB Sync
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (authUser) {
+          await supabase.from('profiles').update({ balance: newBalance }).eq('id', authUser.id);
+      }
+  };
+
+  const handleGamePlay = async (wagerAmount: number) => {
+      if (!user.isLoggedIn) return;
+
+      // 1 XP per 1 Coin wagered
+      const xpGain = Math.floor(wagerAmount); 
+      const newXp = (user.xp || 0) + xpGain;
+      
+      // Update Total Wagered (Accumulate bets)
+      const currentWagered = user.totalWagered || 0;
+      const newTotalWagered = currentWagered + wagerAmount;
+
+      let newLevel = user.level || 0;
+      
+      // Check for Level Up
+      for (const tier of LEVEL_SYSTEM) {
+          if (newXp >= tier.xpRequired && tier.level > newLevel) {
+              newLevel = tier.level;
           }
-          
-          return { 
-            ...p, 
-            xp: newXp,
-            level: newLevel
-          };
-      });
-  };
-
-  const handleLogin = (d: Partial<UserState>) => { 
+      }
+      
+      // Optimistic Update
       setUser(p => ({ 
           ...p, 
-          ...d, 
-          isLoggedIn: true,
-          // Ensure these exist on login
-          level: d.level ?? 0,
-          xp: d.xp ?? 0,
-          claimedLevels: d.claimedLevels ?? []
-      })); 
-      setIsAuthModalOpen(false); 
+          xp: newXp, 
+          level: newLevel,
+          totalWagered: newTotalWagered
+      }));
+
+      // DB Sync
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (authUser) {
+          await supabase.from('profiles')
+            .update({ 
+                xp: newXp, 
+                level: newLevel,
+                total_wagered: newTotalWagered 
+            })
+            .eq('id', authUser.id);
+      }
   };
 
-  const handleLogout = () => { 
-      localStorage.removeItem('moonblox_user'); 
+  const handleLogout = async () => { 
+      await supabase.auth.signOut();
       setUser({ 
           balance: 0, 
           username: 'Guest', 
           isLoggedIn: false, 
           level: 0, 
           xp: 0, 
-          claimedLevels: [] 
+          claimedLevels: [],
+          usernameChanged: false,
+          totalWagered: 0
       }); 
       setCurrentPage('HOME'); 
   };
 
   const handleUpdateProfile = (updates: Partial<UserState>) => {
+    // Optimistic
     setUser(prev => ({ ...prev, ...updates }));
+    // DB sync handled inside SettingsModal for now, or we can refresh here.
   };
 
-  const handleClaimReward = (level: number, reward: number) => {
-    if (user.claimedLevels.includes(level)) return;
-    if (user.level < level) return; // Should be blocked by UI, but good safety
+  const handleClaimReward = async (level: number, reward: number) => {
+    if (!user.isLoggedIn || user.claimedLevels.includes(level)) return;
+    if (user.level < level) return; 
 
+    const newBalance = user.balance + reward;
+    const newClaimed = [...user.claimedLevels, level];
+
+    // Optimistic
     setUser(prev => ({
         ...prev,
-        balance: prev.balance + reward,
-        claimedLevels: [...prev.claimedLevels, level]
+        balance: newBalance,
+        claimedLevels: newClaimed
     }));
+
+    // DB Sync
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    if (authUser) {
+        await supabase.from('profiles').update({
+            balance: newBalance,
+            claimed_levels: newClaimed
+        }).eq('id', authUser.id);
+    }
   };
 
   const handleOpenLogin = () => {
@@ -473,7 +526,7 @@ const App: React.FC = () => {
              </main>
         </div>
         
-        {isAuthModalOpen && <AuthModal onLogin={handleLogin} onClose={() => setIsAuthModalOpen(false)} initialMode={authMode} />}
+        {isAuthModalOpen && <AuthModal onLogin={() => {}} onClose={() => setIsAuthModalOpen(false)} initialMode={authMode} />}
         {isSettingsModalOpen && user.isLoggedIn && (
             <SettingsModal 
                 user={user} 

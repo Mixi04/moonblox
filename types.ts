@@ -23,14 +23,19 @@ export interface UserState {
   level: number;
   xp: number;
   claimedLevels: number[]; // Array of level numbers that have been claimed
+  usernameChanged?: boolean; // Track if user has already changed their name
+  totalWagered: number; // Total amount wagered all-time
 }
 
 export interface ChatMessage {
   id: string;
+  user_id?: string; // Links to auth user
   type: 'self' | 'other' | 'bot' | 'system';
   username: string;
+  avatar?: string;
   text: string;
-  timestamp: Date;
+  created_at?: string; // Database timestamp
+  timestamp: Date; // Frontend object
   rank?: 'ADMIN' | 'MOD' | 'VIP' | 'USER';
 }
 

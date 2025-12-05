@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Bot, User as UserIcon, MessageSquare, CloudRain, Lock, Moon } from 'lucide-react';
 import { ChatMessage } from '../types';
+import { supabase } from '../supabaseClient';
 
 interface ChatProps {
     isOpen: boolean;
@@ -12,31 +13,116 @@ interface ChatProps {
 }
 
 const Chat: React.FC<ChatProps> = ({ isOpen, onClose, username, isLoggedIn, onOpenLogin }) => {
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    { id: '1', type: 'system', username: 'System', text: 'Welcome to MoonBlox! 🌿', timestamp: new Date(), rank: 'ADMIN' },
-  ]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [onlineUsers] = useState(516);
   const scrollRef = useRef<HTMLDivElement>(null);
+  
+  // Use a ref for username to access the latest value in the subscription callback
+  // without triggering a re-subscription
+  const usernameRef = useRef(username);
 
+  useEffect(() => {
+    usernameRef.current = username;
+  }, [username]);
+
+  // 1. Fetch Initial Messages & Setup Realtime
+  useEffect(() => {
+    const fetchMessages = async () => {
+        const { data, error } = await supabase
+            .from('messages')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(50);
+        
+        if (data) {
+            const formatted: ChatMessage[] = data.map((msg: any) => ({
+                id: msg.id,
+                type: msg.username === usernameRef.current ? 'self' : 'other',
+                username: msg.username,
+                text: msg.text,
+                timestamp: new Date(msg.created_at),
+                rank: msg.rank,
+                avatar: msg.avatar
+            })).reverse();
+            setMessages(formatted);
+        }
+    };
+
+    fetchMessages();
+
+    // 2. Realtime Subscription
+    const channel = supabase
+        .channel('global-chat') // Unique channel name
+        .on(
+            'postgres_changes',
+            { event: 'INSERT', schema: 'public', table: 'messages' },
+            (payload) => {
+                const newMsg = payload.new;
+                
+                setMessages((prev) => {
+                    // Prevent duplicates
+                    if (prev.some(m => m.id === newMsg.id)) return prev;
+
+                    const formattedMsg: ChatMessage = {
+                        id: newMsg.id,
+                        type: newMsg.username === usernameRef.current ? 'self' : 'other',
+                        username: newMsg.username,
+                        text: newMsg.text,
+                        timestamp: new Date(newMsg.created_at),
+                        rank: newMsg.rank,
+                        avatar: newMsg.avatar
+                    };
+                    return [...prev, formattedMsg];
+                });
+            }
+        )
+        .subscribe();
+
+    return () => {
+        supabase.removeChannel(channel);
+    };
+  }, []); // Run once on mount
+
+  // Update types for existing messages if username changes (e.g. login)
+  useEffect(() => {
+      setMessages(prev => prev.map(msg => ({
+          ...msg,
+          type: msg.username === username ? 'self' : 'other'
+      })));
+  }, [username]);
+
+  // Scroll to bottom on new message
   useEffect(() => {
     if (scrollRef.current) {
         scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!inputValue.trim() || !isLoggedIn) return;
-    const userMsg: ChatMessage = {
-        id: Date.now().toString(), 
-        type: 'self', 
-        username: username, 
-        text: inputValue, 
-        timestamp: new Date(), 
-        rank: 'USER'
-    };
-    setMessages(prev => [...prev, userMsg]);
-    setInputValue('');
+    
+    // Get current user ID
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const textToSend = inputValue;
+    setInputValue(''); // Optimistic clear
+
+    // Insert into DB
+    const { error } = await supabase
+        .from('messages')
+        .insert({
+            user_id: user.id,
+            username: username,
+            text: textToSend,
+            rank: 'USER' // Can be enhanced to fetch real rank
+        });
+    
+    if (error) {
+        console.error('Error sending message:', error);
+        setInputValue(textToSend); // Restore if failed
+    }
   };
 
   return (
@@ -68,11 +154,16 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onClose, username, isLoggedIn, onOp
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-3 space-y-3 scrollbar-hide bg-[#15131D]" ref={scrollRef}>
+             {messages.length === 0 && (
+                 <div className="text-center text-gray-600 text-xs mt-10 italic">No messages yet. Say hello!</div>
+             )}
              {messages.map(msg => (
                  <div key={msg.id} className="group flex items-start gap-3 animate-fade-in hover:bg-white/5 p-1 rounded-lg transition-colors cursor-pointer">
                     <div className="relative">
                         <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold border border-white/5 overflow-hidden ${msg.type === 'bot' ? 'bg-indigo-600' : 'bg-[#2A2737]'}`}>
-                            {msg.type === 'bot' ? <Bot size={16} /> : <UserIcon size={16} className="text-gray-500" />}
+                            {msg.type === 'bot' ? <Bot size={16} /> : 
+                             msg.avatar ? <img src={msg.avatar} alt="av" className="w-full h-full object-cover"/> :
+                             <UserIcon size={16} className="text-gray-500" />}
                         </div>
                          {msg.rank === 'VIP' && <div className="absolute -bottom-1 -right-1 bg-blox-accent text-black text-[8px] font-bold px-1 rounded-sm border border-blox-surface">VIP</div>}
                          {msg.rank === 'MOD' && <div className="absolute -bottom-1 -right-1 bg-green-500 text-black text-[8px] font-bold px-1 rounded-sm border border-blox-surface">MOD</div>}
