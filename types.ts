@@ -27,6 +27,15 @@ export interface UserState {
   totalWagered: number; // Total amount wagered all-time
 }
 
+export interface PublicProfile {
+  id: string;
+  username: string;
+  avatar?: string;
+  level: number;
+  totalWagered: number;
+  createdAt: string;
+}
+
 export interface ChatMessage {
   id: string;
   user_id?: string; // Links to auth user

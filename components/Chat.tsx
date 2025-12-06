@@ -11,16 +11,15 @@ interface ChatProps {
     avatar?: string;
     isLoggedIn: boolean;
     onOpenLogin: () => void;
+    onUserClick: (userId: string) => void;
 }
 
-const Chat: React.FC<ChatProps> = ({ isOpen, onClose, username, avatar, isLoggedIn, onOpenLogin }) => {
+const Chat: React.FC<ChatProps> = ({ isOpen, onClose, username, avatar, isLoggedIn, onOpenLogin, onUserClick }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [onlineUsers] = useState(516);
   const scrollRef = useRef<HTMLDivElement>(null);
   
-  // Use a ref for username to access the latest value in the subscription callback
-  // without triggering a re-subscription
   const usernameRef = useRef(username);
 
   useEffect(() => {
@@ -39,6 +38,7 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onClose, username, avatar, isLogged
         if (data) {
             const formatted: ChatMessage[] = data.map((msg: any) => ({
                 id: msg.id,
+                user_id: msg.user_id,
                 type: msg.username === usernameRef.current ? 'self' : 'other',
                 username: msg.username,
                 text: msg.text,
@@ -67,6 +67,7 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onClose, username, avatar, isLogged
 
                     const formattedMsg: ChatMessage = {
                         id: newMsg.id,
+                        user_id: newMsg.user_id,
                         type: newMsg.username === usernameRef.current ? 'self' : 'other',
                         username: newMsg.username,
                         text: newMsg.text,
@@ -161,7 +162,11 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onClose, username, avatar, isLogged
              )}
              {messages.map(msg => (
                  <div key={msg.id} className="group flex items-start gap-3 animate-fade-in hover:bg-white/5 p-1 rounded-lg transition-colors cursor-pointer">
-                    <div className="relative">
+                    <div 
+                        className="relative"
+                        onClick={() => msg.user_id && onUserClick(msg.user_id)}
+                        title="View Profile"
+                    >
                         <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold border border-white/5 overflow-hidden ${msg.type === 'bot' ? 'bg-indigo-600' : 'bg-[#2A2737]'}`}>
                             {msg.type === 'bot' ? <Bot size={16} /> : 
                              msg.avatar ? <img src={msg.avatar} alt="av" className="w-full h-full object-cover"/> :
@@ -173,9 +178,12 @@ const Chat: React.FC<ChatProps> = ({ isOpen, onClose, username, avatar, isLogged
                     
                     <div className="flex-1 min-w-0">
                         <div className="flex items-baseline gap-2">
-                            <span className={`text-xs font-bold truncate ${msg.rank === 'VIP' ? 'text-blox-accent' : msg.rank === 'MOD' ? 'text-green-400' : 'text-gray-400'}`}>
+                            <button 
+                                onClick={() => msg.user_id && onUserClick(msg.user_id)}
+                                className={`text-xs font-bold truncate hover:underline ${msg.rank === 'VIP' ? 'text-blox-accent' : msg.rank === 'MOD' ? 'text-green-400' : 'text-gray-400'}`}
+                            >
                                 {msg.username}
-                            </span>
+                            </button>
                             <span className="text-[10px] text-gray-600">{msg.timestamp.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</span>
                         </div>
                         <p className="text-xs text-gray-300 leading-relaxed break-words font-medium">

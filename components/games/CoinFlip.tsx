@@ -29,7 +29,8 @@ const CoinFlip: React.FC<GameProps> = ({ balance, updateBalance, onPlay, isLogge
       setResult(outcome);
       setIsFlipping(false);
       if (outcome === choice) {
-        const win = betAmount * 2;
+        // 1.95x Payout (2.5% House Edge)
+        const win = Math.floor(betAmount * 1.95);
         updateBalance(win);
         setWinAmount(win);
       }
@@ -81,6 +82,9 @@ const CoinFlip: React.FC<GameProps> = ({ balance, updateBalance, onPlay, isLogge
                     <button onClick={() => setChoice('TAILS')} disabled={isFlipping || !isLoggedIn}
                         className={`p-4 rounded-xl border font-black transition-all ${choice === 'TAILS' ? 'border-gray-500 bg-gray-500/10 text-gray-300' : 'border-blox-border bg-blox-surfaceHighlight text-gray-500'}`}
                     >TAILS</button>
+                 </div>
+                 <div className="mt-4 text-center text-xs font-bold text-gray-500">
+                    Payout: <span className="text-white">1.95x</span>
                  </div>
             </div>
 

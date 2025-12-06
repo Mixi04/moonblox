@@ -17,7 +17,8 @@ const Mines: React.FC<GameProps> = ({ balance, updateBalance, onPlay, isLoggedIn
   const getMultiplier = () => {
     const revealedCount = revealed.filter(Boolean).length;
     let mult = 1.0;
-    for(let i=0; i<revealedCount; i++) mult *= 0.99 * ( (GRID_SIZE - i) / (GRID_SIZE - mineCount - i));
+    // Base 0.975 (2.5% House Edge)
+    for(let i=0; i<revealedCount; i++) mult *= 0.975 * ( (GRID_SIZE - i) / (GRID_SIZE - mineCount - i));
     return Math.max(1.0, mult);
   };
 

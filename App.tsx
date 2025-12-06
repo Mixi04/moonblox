@@ -10,7 +10,8 @@ import SettingsModal from './components/SettingsModal';
 import ProfileModal from './components/ProfileModal';
 import WalletModal from './components/WalletModal';
 import Leaderboard from './components/Leaderboard';
-import { UserState, AuthMode } from './types';
+import UserStatsModal from './components/UserStatsModal';
+import { UserState, AuthMode, PublicProfile } from './types';
 import { supabase } from './supabaseClient';
 import { 
     Rocket, Coins, Bomb, ArrowUpCircle, Sword, 
@@ -54,8 +55,20 @@ const App: React.FC = () => {
         totalWagered: 0
   });
 
-  // Client-Side Router State
-  const [currentPath, setCurrentPath] = useState(window.location.pathname);
+  // Client-Side Router State with Safe Initialization
+  const [currentPath, setCurrentPath] = useState(() => {
+      try {
+          const path = window.location.pathname;
+          // Robust matching for sub-paths or previews
+          if (path.endsWith('/leaderboard')) return '/leaderboard';
+          if (path.endsWith('/crash')) return '/crash';
+          if (path.endsWith('/coinflip')) return '/coinflip';
+          if (path.endsWith('/mines')) return '/mines';
+          return '/';
+      } catch (e) {
+          return '/';
+      }
+  });
   
   const [isChatOpen, setIsChatOpen] = useState(true);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -64,19 +77,35 @@ const App: React.FC = () => {
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
   const [walletTab, setWalletTab] = useState<'DEPOSIT' | 'WITHDRAW'>('DEPOSIT');
   const [authMode, setAuthMode] = useState<AuthMode>('SIGNUP');
+  
+  // State for viewing other user's profiles
+  const [viewedProfile, setViewedProfile] = useState<PublicProfile | null>(null);
 
-  // Handle Browser Back/Forward
+  // Handle Browser Back/Forward safely
   useEffect(() => {
     const handlePopState = () => {
-        setCurrentPath(window.location.pathname);
+        const path = window.location.pathname;
+        if (path.endsWith('/leaderboard')) setCurrentPath('/leaderboard');
+        else if (path.endsWith('/crash')) setCurrentPath('/crash');
+        else if (path.endsWith('/coinflip')) setCurrentPath('/coinflip');
+        else if (path.endsWith('/mines')) setCurrentPath('/mines');
+        else setCurrentPath('/');
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
   const navigate = (path: string) => {
-      window.history.pushState({}, '', path);
+      // 1. Update React State first (ensures UI changes even if history fails)
       setCurrentPath(path);
+      
+      // 2. Try to update Browser History
+      try {
+          window.history.pushState({}, '', path);
+      } catch (e) {
+          // If in a restrictive iframe/preview, ignore the error
+          console.warn("URL update blocked by environment (Navigation visuals maintained)", e);
+      }
   };
 
   // Supabase Auth Listener & Profile Fetcher
@@ -254,27 +283,69 @@ const App: React.FC = () => {
       setIsWalletModalOpen(true);
   };
 
+  // --- Profile Viewing & Tipping ---
+  const handleViewUser = async (userId: string) => {
+      if (!userId) return;
+      
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, username, avatar, level, total_wagered, updated_at') // updated_at as proxy for created_at
+        .eq('id', userId)
+        .single();
+    
+      if (data) {
+          setViewedProfile({
+              id: data.id,
+              username: data.username,
+              avatar: data.avatar,
+              level: data.level,
+              totalWagered: data.total_wagered,
+              createdAt: data.updated_at // In a real app, you'd add a created_at column
+          });
+      }
+  };
+
+  const handleSendTip = async (amount: number) => {
+      if (!viewedProfile || !user.isLoggedIn) return;
+      
+      // Call the secure RPC function
+      const { error } = await supabase.rpc('transfer_mooncoins', {
+          receiver_id: viewedProfile.id,
+          amount: amount
+      });
+
+      if (error) {
+          throw error;
+      }
+
+      // Optimistic update of own balance
+      updateBalance(-amount);
+  };
+
   // --- Components ---
 
   const GameCardLarge = ({ title, color, icon: Icon, image, onClick }: any) => (
       <div 
         onClick={onClick}
-        className="relative h-48 rounded-2xl overflow-hidden cursor-pointer group border border-blox-border/50 hover:border-blox-accent transition-all duration-300 bg-blox-surface/40 backdrop-blur-xl shadow-lg"
+        className="relative h-48 rounded-2xl overflow-hidden cursor-pointer group border border-blox-border/50 hover:border-blox-accent transition-all duration-300 bg-blox-surface/40 backdrop-blur-xl shadow-lg hover:shadow-2xl hover:shadow-blox-accent/10 hover:-translate-y-1"
       >
+         {/* Gloss Overlay */}
+         <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 z-10 pointer-events-none"></div>
+
          <div className={`absolute inset-0 opacity-10 ${color} group-hover:opacity-20 transition-opacity`}></div>
          {/* Placeholder Patterns */}
          <div className="absolute inset-0 flex items-center justify-center opacity-30 group-hover:scale-105 transition-transform duration-500">
              {image ? image : <Icon size={80} />}
          </div>
          
-         <div className="absolute top-4 left-4 z-10 flex items-center gap-2">
+         <div className="absolute top-4 left-4 z-20 flex items-center gap-2">
              <div className="bg-black/30 p-2 rounded-lg backdrop-blur-sm">
                 <Icon size={18} className="text-white" />
              </div>
              <span className="font-black text-lg text-white uppercase tracking-wider drop-shadow-md">{title}</span>
          </div>
          
-         <div className="absolute bottom-4 right-4 z-10 opacity-0 group-hover:opacity-100 transition-opacity translate-y-2 group-hover:translate-y-0">
+         <div className="absolute bottom-4 right-4 z-20 opacity-0 group-hover:opacity-100 transition-opacity translate-y-2 group-hover:translate-y-0">
              <div className="bg-blox-accent text-black text-xs font-bold px-4 py-2 rounded-full shadow-lg">PLAY NOW</div>
          </div>
       </div>
@@ -283,15 +354,18 @@ const App: React.FC = () => {
   const GameCardSmall = ({ title, icon: Icon, color, isNew, onClick, balance, coverImage }: any) => (
       <div 
         onClick={onClick}
-        className="relative h-32 rounded-2xl p-4 overflow-hidden group cursor-pointer border border-blox-border/50 hover:border-blox-accent transition-all shadow-lg bg-blox-surface/40 backdrop-blur-xl"
+        className="relative w-full aspect-[3/2] rounded-2xl p-4 overflow-hidden group cursor-pointer border border-blox-border/50 hover:border-blox-accent transition-all shadow-lg hover:shadow-xl hover:shadow-blox-accent/10 hover:-translate-y-1 bg-blox-surface/40 backdrop-blur-xl flex flex-col justify-between"
       >
+          {/* Gloss Overlay */}
+          <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 z-10 pointer-events-none"></div>
+
           {/* Background Image if available */}
           {coverImage && (
               <div 
-                className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-110 opacity-80"
+                className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-110 opacity-80"
                 style={{ backgroundImage: `url(${coverImage})` }}
               >
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent"></div>
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent"></div>
               </div>
           )}
 
@@ -299,33 +373,31 @@ const App: React.FC = () => {
              <div className={`absolute -right-6 -bottom-6 w-24 h-24 rounded-full ${color} opacity-10 group-hover:opacity-20 blur-xl transition-opacity`}></div>
           )}
           
-          <div className="relative z-10 flex justify-between items-start mb-2">
+          <div className="relative z-20 flex justify-between items-start w-full">
               <div className="flex items-center gap-2">
-                <div className="bg-black/40 backdrop-blur-md p-1.5 rounded-lg border border-white/10">
-                    <Icon size={16} className="text-gray-200 group-hover:text-white transition-colors" />
+                <div className="bg-black/40 backdrop-blur-md p-2 rounded-lg border border-white/10 group-hover:bg-white/10 transition-colors">
+                    <Icon size={20} className="text-gray-200 group-hover:text-white transition-colors" />
                 </div>
-                <span className="font-black text-white uppercase text-sm drop-shadow-md tracking-wide">{title}</span>
               </div>
-              {isNew && <span className="bg-[#F59E0B] text-black text-[10px] font-black px-2 py-0.5 rounded shadow-lg">NEW</span>}
+              
+              <div className="flex items-center gap-2">
+                  {balance && (
+                    <div className="bg-black/60 backdrop-blur-md px-2 py-1 rounded-lg border border-white/10 flex items-center gap-1">
+                        <div className="w-3 h-3 rounded-full bg-yellow-500 flex items-center justify-center text-[8px] text-black font-bold">M</div>
+                        <span className="text-[10px] font-mono font-bold text-yellow-500">{balance}</span>
+                    </div>
+                  )}
+                  {isNew && <span className="bg-[#F59E0B] text-black text-[10px] font-black px-2 py-0.5 rounded shadow-lg animate-pulse">NEW</span>}
+              </div>
           </div>
 
-          {!coverImage && (
-            <div className="relative z-10 mt-4 flex justify-center group-hover:scale-110 transition-transform duration-300">
-                <Icon size={40} className={`drop-shadow-lg opacity-80 ${color.replace('bg-', 'text-')}`} />
-            </div>
-          )}
-
-          <div className="absolute bottom-0 left-0 w-full h-1/2 flex items-center justify-center translate-y-full group-hover:translate-y-0 transition-transform duration-300 z-20">
-             <span className="text-blox-accent font-black text-xs uppercase tracking-widest drop-shadow-lg bg-black/50 px-3 py-1 rounded-full border border-blox-accent/30 backdrop-blur-sm">Click to Play</span>
+          <div className="relative z-20 mt-auto">
+             <span className="font-black text-white text-2xl uppercase drop-shadow-md tracking-wide block leading-none">{title}</span>
           </div>
-          
-          {/* Jackpot/Pot display simulator */}
-          {balance && (
-              <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-md px-2 py-1 rounded-lg border border-white/10 flex items-center gap-1 group-hover:opacity-0 transition-opacity z-10">
-                  <div className="w-3 h-3 rounded-full bg-yellow-500 flex items-center justify-center text-[8px] text-black font-bold">M</div>
-                  <span className="text-[10px] font-mono font-bold text-yellow-500">{balance}</span>
-              </div>
-          )}
+
+          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-30 bg-black/20 backdrop-blur-[2px]">
+             <span className="text-blox-accent font-black text-sm uppercase tracking-widest drop-shadow-lg bg-black/80 px-6 py-3 rounded-full border border-blox-accent/50 shadow-2xl transform scale-90 group-hover:scale-100 transition-transform">Play</span>
+          </div>
       </div>
   );
 
@@ -333,7 +405,7 @@ const App: React.FC = () => {
       <div className="p-6 max-w-[1600px] mx-auto animate-fade-in pb-20 relative z-10">
           
           <div className="flex items-center justify-center mb-10">
-               <div className="bg-blox-surface/60 backdrop-blur-2xl border border-white/10 px-10 py-3 rounded-2xl shadow-2xl relative group overflow-hidden">
+               <div className="bg-blox-surface/60 backdrop-blur-2xl border border-white/10 px-10 py-3 rounded-2xl shadow-2xl relative group overflow-hidden hover:scale-105 transition-transform duration-500">
                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-blox-surface/80 border border-blox-border rounded-full p-2 shadow-lg">
                        <Crown size={20} className="text-[#F59E0B] fill-[#F59E0B] drop-shadow-md" />
@@ -343,7 +415,7 @@ const App: React.FC = () => {
           </div>
 
           {/* Featured Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
               <GameCardLarge 
                 title="Cases" 
                 color="bg-blue-600" 
@@ -379,13 +451,13 @@ const App: React.FC = () => {
               />
           </div>
 
-          {/* Secondary Grid */}
+          {/* Secondary Grid (4:3 Aspect Ratio Cards) */}
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-6">
                <GameCardSmall 
                     title="Crash" 
                     icon={Rocket} 
                     color="bg-red-500" 
-                    balance="200,000"
+                    balance="200k"
                     coverImage={COVER_IMAGES.CRASH}
                     onClick={() => navigate('/crash')} 
                />
@@ -416,6 +488,7 @@ const App: React.FC = () => {
   );
 
   const renderContent = () => {
+      // Robust switch that defaults to Home for any unknown path
       switch (currentPath) {
           case '/leaderboard':
               return <Leaderboard user={user} onGoHome={() => navigate('/')} />;
@@ -491,6 +564,7 @@ const App: React.FC = () => {
                 avatar={user.avatar}
                 isLoggedIn={user.isLoggedIn}
                 onOpenLogin={handleOpenLogin}
+                onUserClick={handleViewUser}
              />
         </div>
 
@@ -598,6 +672,16 @@ const App: React.FC = () => {
                 onDeposit={(amount) => updateBalance(amount)}
                 onWithdraw={(amount) => updateBalance(-amount)}
                 initialTab={walletTab}
+            />
+        )}
+        
+        {/* User Stats & Tipping Modal */}
+        {viewedProfile && (
+            <UserStatsModal 
+                profile={viewedProfile}
+                currentUser={user}
+                onClose={() => setViewedProfile(null)}
+                onTip={handleSendTip}
             />
         )}
     </div>

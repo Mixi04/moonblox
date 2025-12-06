@@ -97,10 +97,17 @@ const Crash: React.FC<GameProps> = ({ balance, updateBalance, onPlay, isLoggedIn
         return;
     }
     if (betAmount > balance || betAmount <= 0) return;
+    
+    // House Edge Logic (2.5%)
+    // Formula: 0.975 / (1 - random)
     const r = Math.random();
-    let cp = 0.99 / (1 - r);
+    let cp = 0.975 / (1 - r);
+    
     if (cp < 1.0) cp = 1.0;
-    if (cp > 50) cp = 50;
+    // Cap strictly for safety, though math allows higher
+    // Ideally we floor it to 2 decimals
+    cp = Math.floor(cp * 100) / 100;
+
     setCrashPoint(cp);
     setIsPlaying(true);
     setCrashed(false);
