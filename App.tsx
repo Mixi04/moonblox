@@ -40,7 +40,8 @@ const COVER_IMAGES = {
     MINES: "https://res.cloudinary.com/devlfz6tf/image/upload/v1764978031/d0eed63e-3985-4b14-ac5a-11503b92b728.png",
     COINFLIP: "https://res.cloudinary.com/devlfz6tf/image/upload/v1764978020/ef85ab4d-a03b-4b14-949b-07fcde55ec3d.png",
     CRASH: "https://res.cloudinary.com/devlfz6tf/image/upload/v1764978237/b902a774-3fdb-4f5e-979e-74edc33d7f6e.png",
-    CASES: "https://res.cloudinary.com/devlfz6tf/image/upload/v1764980765/bd77977d-260c-48fa-b958-33245b1da923.png"
+    CASES: "https://res.cloudinary.com/devlfz6tf/image/upload/v1764980765/bd77977d-260c-48fa-b958-33245b1da923.png",
+    CASE_BATTLES: "https://res.cloudinary.com/devlfz6tf/image/upload/v1764981435/322ccbf5-f20f-4b0c-8490-85ff42869ace.png"
 };
 
 const App: React.FC = () => {
@@ -439,13 +440,7 @@ const App: React.FC = () => {
                 title="Case Battles" 
                 color="bg-red-600" 
                 icon={Sword} 
-                image={
-                    <div className="flex gap-4 items-center">
-                         <div className="w-20 h-20 bg-red-500/80 rounded-lg transform -rotate-6 border border-white/20 backdrop-blur-sm shadow-xl"></div>
-                         <div className="text-4xl font-black italic text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.5)]">VS</div>
-                         <div className="w-20 h-20 bg-blue-500/80 rounded-lg transform rotate-6 border border-white/20 backdrop-blur-sm shadow-xl"></div>
-                    </div>
-                }
+                coverImage={COVER_IMAGES.CASE_BATTLES}
                 onClick={() => {}} 
               />
               <GameCardLarge 
