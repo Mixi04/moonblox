@@ -39,7 +39,8 @@ const COVER_IMAGES = {
     BLACKJACK: "https://res.cloudinary.com/devlfz6tf/image/upload/v1764978071/0a6f6930-eda4-4969-b5df-1243d63d67b9.png",
     MINES: "https://res.cloudinary.com/devlfz6tf/image/upload/v1764978031/d0eed63e-3985-4b14-ac5a-11503b92b728.png",
     COINFLIP: "https://res.cloudinary.com/devlfz6tf/image/upload/v1764978020/ef85ab4d-a03b-4b14-949b-07fcde55ec3d.png",
-    CRASH: "https://res.cloudinary.com/devlfz6tf/image/upload/v1764978237/b902a774-3fdb-4f5e-979e-74edc33d7f6e.png"
+    CRASH: "https://res.cloudinary.com/devlfz6tf/image/upload/v1764978237/b902a774-3fdb-4f5e-979e-74edc33d7f6e.png",
+    CASES: "https://res.cloudinary.com/devlfz6tf/image/upload/v1764980765/bd77977d-260c-48fa-b958-33245b1da923.png"
 };
 
 const App: React.FC = () => {
@@ -324,7 +325,7 @@ const App: React.FC = () => {
 
   // --- Components ---
 
-  const GameCardLarge = ({ title, color, icon: Icon, image, onClick }: any) => (
+  const GameCardLarge = ({ title, color, icon: Icon, image, onClick, coverImage }: any) => (
       <div 
         onClick={onClick}
         className="relative h-48 rounded-2xl overflow-hidden cursor-pointer group border border-blox-border/50 hover:border-blox-accent transition-all duration-300 bg-blox-surface/40 backdrop-blur-xl shadow-lg hover:shadow-2xl hover:shadow-blox-accent/10 hover:-translate-y-1"
@@ -332,11 +333,22 @@ const App: React.FC = () => {
          {/* Gloss Overlay */}
          <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 z-10 pointer-events-none"></div>
 
-         <div className={`absolute inset-0 opacity-10 ${color} group-hover:opacity-20 transition-opacity`}></div>
-         {/* Placeholder Patterns */}
-         <div className="absolute inset-0 flex items-center justify-center opacity-30 group-hover:scale-105 transition-transform duration-500">
-             {image ? image : <Icon size={80} />}
-         </div>
+         {/* Background Cover Image */}
+         {coverImage ? (
+            <div 
+                className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-110 opacity-90"
+                style={{ backgroundImage: `url(${coverImage})` }}
+            >
+                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent"></div>
+            </div>
+         ) : (
+            <>
+                <div className={`absolute inset-0 opacity-10 ${color} group-hover:opacity-20 transition-opacity`}></div>
+                <div className="absolute inset-0 flex items-center justify-center opacity-30 group-hover:scale-105 transition-transform duration-500">
+                    {image ? image : <Icon size={80} />}
+                </div>
+            </>
+         )}
          
          <div className="absolute top-4 left-4 z-20 flex items-center gap-2">
              <div className="bg-black/30 p-2 rounded-lg backdrop-blur-sm">
@@ -420,7 +432,7 @@ const App: React.FC = () => {
                 title="Cases" 
                 color="bg-blue-600" 
                 icon={Box} 
-                image={<div className="w-32 h-32 bg-gradient-to-tr from-blue-500/80 to-cyan-400/80 rounded-xl transform rotate-12 shadow-2xl border border-white/10 backdrop-blur-sm"></div>}
+                coverImage={COVER_IMAGES.CASES}
                 onClick={() => {}} 
               />
               <GameCardLarge 
